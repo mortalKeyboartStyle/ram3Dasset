@@ -4,11 +4,10 @@ import torch
 from torch.utils.data import DataLoader
 from PIL import Image
 
-from model import VAE, vae_loss, Generator, Discriminator
+from model import VAE, vae_loss, Generator, Discriminator, reparameterize
 from dataset import ImageDataset
 
-# Funkcja montowania Google Drive – działa w Google Colab.
-# W środowisku lokalnym ta funkcja zostanie pominięta.
+# Funkcja montowania Google Drive – działa tylko w Colabie
 def mount_drive_if_colab():
     try:
         import google.colab
@@ -18,8 +17,8 @@ def mount_drive_if_colab():
     except Exception as e:
         print("Nie uruchamiasz w środowisku Colab, pomijam montowanie Drive.")
 
-# Przykładowa funkcja generująca dummy model 3D (kostka)
 def generate_dummy_3d_model():
+    # Przykładowy model 3D – kostka
     vertices = [
         [0, 0, 0],
         [1, 0, 0],
@@ -47,22 +46,24 @@ def generate_dummy_3d_model():
     return {"vertices": vertices, "faces": faces}
 
 def main():
+    # Montowanie Google Drive (jeśli uruchamiasz w Colab)
     mount_drive_if_colab()
     
-    # Wprowadź ścieżkę do pliku – w Colabie będzie to ścieżka do pliku na Google Drive.
+    # Pobranie ścieżki do pliku ze zdjęciem od użytkownika
     image_path = input("Podaj pełną ścieżkę do pliku ze zdjęciem 4K (np. /content/drive/MyDrive/4K_image.jpg): ").strip()
     if not os.path.exists(image_path):
-        print("Podany plik nie istnieje! Sprawdź ścieżkę.")
+        print("Podany plik nie istnieje! Sprawdź ścieżkę:", image_path)
         sys.exit(1)
     
+    # Wczytanie obrazu przy użyciu datasetu
     dataset = ImageDataset(image_path)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     
-    # Wczytaj obraz
     for img in dataloader:
         input_img = img.to("cuda" if torch.cuda.is_available() else "cpu")
         print("Obraz wczytany. Rozmiary:", input_img.size())
     
+    # Ustawienia modelu
     latent_dim = 128
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -70,7 +71,7 @@ def main():
     vae = VAE(latent_dim).to(device)
     optimizer_vae = torch.optim.Adam(vae.parameters(), lr=0.0002)
     
-    # Ze względu na ograniczone zasoby T4, używamy mniejszej liczby epok.
+    # Trening modelu VAE (przykładowa pętla na 10 epok)
     num_epochs = 10
     for epoch in range(num_epochs):
         optimizer_vae.zero_grad()
@@ -80,17 +81,26 @@ def main():
         optimizer_vae.step()
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss.item():.2f}")
     
-    os.makedirs("outputs", exist_ok=True)
-    output_path = os.path.join("outputs", "reconstructed.jpg")
+    # Ustalenie ścieżki zapisu wyników
+    # Jeśli uruchamiasz w Colabie, zapisz na Google Drive; lokalnie – w folderze outputs/
+    if os.path.exists("/content/drive/MyDrive"):
+        output_dir = "/content/drive/MyDrive/ram3Dasset_outputs"
+    else:
+        output_dir = "outputs"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Zapis rekonstrukcji obrazu
+    output_recon = os.path.join(output_dir, "reconstructed.jpg")
     recon_np = recon_img.squeeze(0).detach().cpu().numpy().transpose(1, 2, 0)
     recon_np = (recon_np * 255).clip(0, 255).astype('uint8')
-    Image.fromarray(recon_np).save(output_path)
-    print("Rekonstrukcja zapisana w:", output_path)
+    Image.fromarray(recon_np).save(output_recon)
+    print("Rekonstrukcja zapisana w:", output_recon)
     
-    # Eksport przykładowego modelu 3D (dummy kostka)
+    # Eksport przykładowego modelu 3D do pliku .glb
     from export_3d import export_model_to_glb
     model_data = generate_dummy_3d_model()
-    export_model_to_glb(model_data["vertices"], model_data["faces"], filename="outputs/model.glb")
+    output_model = os.path.join(output_dir, "model.glb")
+    export_model_to_glb(model_data["vertices"], model_data["faces"], filename=output_model)
     
     print("Projekt uruchomiony pomyślnie.")
 
