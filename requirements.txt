@@ -1,3 +1,9 @@
+
+---
+
+## Plik: requirements.txt
+
+```text
 torch
 torchvision
 matplotlib
