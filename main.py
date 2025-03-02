@@ -7,15 +7,16 @@ from PIL import Image
 from model import VAE, vae_loss, Generator, Discriminator
 from dataset import ImageDataset
 
-# Funkcja montowania Google Drive – działa w Google Colab
+# Funkcja montowania Google Drive – działa w Google Colab.
+# W środowisku lokalnym ta funkcja zostanie pominięta.
 def mount_drive_if_colab():
     try:
         import google.colab
         from google.colab import drive
         drive.mount('/content/drive')
         print("Google Drive zamontowany.")
-    except ImportError:
-        print("Nie uruchamiasz w środowisku Colab.")
+    except Exception as e:
+        print("Nie uruchamiasz w środowisku Colab, pomijam montowanie Drive.")
 
 # Przykładowa funkcja generująca dummy model 3D (kostka)
 def generate_dummy_3d_model():
@@ -48,6 +49,7 @@ def generate_dummy_3d_model():
 def main():
     mount_drive_if_colab()
     
+    # Wprowadź ścieżkę do pliku – w Colabie będzie to ścieżka do pliku na Google Drive.
     image_path = input("Podaj pełną ścieżkę do pliku ze zdjęciem 4K (np. /content/drive/MyDrive/4K_image.jpg): ").strip()
     if not os.path.exists(image_path):
         print("Podany plik nie istnieje! Sprawdź ścieżkę.")
@@ -56,6 +58,7 @@ def main():
     dataset = ImageDataset(image_path)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     
+    # Wczytaj obraz
     for img in dataloader:
         input_img = img.to("cuda" if torch.cuda.is_available() else "cpu")
         print("Obraz wczytany. Rozmiary:", input_img.size())
@@ -63,10 +66,11 @@ def main():
     latent_dim = 128
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Inicjalizacja VAE i optymalizatora
+    # Inicjalizacja modelu VAE i optymalizatora
     vae = VAE(latent_dim).to(device)
     optimizer_vae = torch.optim.Adam(vae.parameters(), lr=0.0002)
     
+    # Ze względu na ograniczone zasoby T4, używamy mniejszej liczby epok.
     num_epochs = 10
     for epoch in range(num_epochs):
         optimizer_vae.zero_grad()
@@ -79,11 +83,11 @@ def main():
     os.makedirs("outputs", exist_ok=True)
     output_path = os.path.join("outputs", "reconstructed.jpg")
     recon_np = recon_img.squeeze(0).detach().cpu().numpy().transpose(1, 2, 0)
-    recon_np = (recon_np * 255).clip(0,255).astype('uint8')
+    recon_np = (recon_np * 255).clip(0, 255).astype('uint8')
     Image.fromarray(recon_np).save(output_path)
     print("Rekonstrukcja zapisana w:", output_path)
     
-    # Eksport przykładowego modelu 3D do .glb
+    # Eksport przykładowego modelu 3D (dummy kostka)
     from export_3d import export_model_to_glb
     model_data = generate_dummy_3d_model()
     export_model_to_glb(model_data["vertices"], model_data["faces"], filename="outputs/model.glb")

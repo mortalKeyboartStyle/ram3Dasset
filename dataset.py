@@ -7,7 +7,7 @@ class ImageDataset(Dataset):
     def __init__(self, image_path, transform=None):
         self.image_path = image_path
         self.transform = transform if transform else transforms.Compose([
-            transforms.Resize((256, 256)),  # Dla uproszczenia – można dostosować dla fragmentów 4K
+            transforms.Resize((256, 256)),  # Dla uproszczenia – można eksperymentować z większą rozdzielczością
             transforms.ToTensor()
         ])
         self.image = Image.open(self.image_path).convert("RGB")
